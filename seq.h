@@ -1,3 +1,6 @@
+#ifndef SEQ_H_
+#define SEQ_H_
+
 template<int... Nums>
 struct Sequence { };
 
@@ -9,3 +12,5 @@ struct IndexSequence<0, Nums...>
 {
     typedef Sequence<Nums...> seq;
 };
+
+#endif /* SEQ_H_ */

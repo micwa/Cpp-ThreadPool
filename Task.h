@@ -1,3 +1,6 @@
+#ifndef TASK_H_
+#define TASK_H_
+
 #include <future>
 #include <algorithm>
 #include <utility>
@@ -13,7 +16,7 @@ private:
     std::tuple<Args...> args_;
 
     template<int... Nums>
-    void executeActually(Sequence<Nums...> seq);
+    void executeActually(Sequence<Nums...>);
 public:
     Task();
 
@@ -28,8 +31,9 @@ public:
 
     void execute();
     
-    template <class Fn>
-    std::future<typename std::result_of<Fn(Args...)>::type> getFuture(Fn&& fn);
+    // Need to figure out a way to typedef this
+    std::future<typename std::result_of<typename std::decay<FunctionType>::type(Args...)>::type>
+    getFuture();
 };
 
 template <class FunctionType, class... Args>
@@ -64,16 +68,18 @@ void Task<FunctionType, Args...>::execute()
 }
 
 template <class FunctionType, class... Args>
-template <class Fn>
-std::future<typename std::result_of<Fn(Args...)>::type>
-Task<FunctionType, Args...>::getFuture(Fn&& fn)
+std::future<typename std::result_of<typename std::decay<FunctionType>::type(Args...)>::type>
+Task<FunctionType, Args...>::getFuture()
 {
     return std::move(task_.get_future());
 }
 
+// Not actually using the Sequence - we just want (to expand) the template arguments
 template <class FunctionType, class... Args>
 template <int... Nums>
-void Task<FunctionType, Args...>::executeActually(Sequence<Nums...> seq)
+void Task<FunctionType, Args...>::executeActually(Sequence<Nums...>)
 {
-     task_(std::get<Nums>(args_)...);
+    task_(std::get<Nums>(args_)...);
 }
+
+#endif /* TASK_H_ */
