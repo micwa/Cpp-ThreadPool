@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <cassert>
 
-#include "ThreadPool.h"
+#include "../ThreadPool.h"
 
 using namespace std;
 
@@ -49,52 +49,66 @@ int expensiveComputation(unsigned x)
     return x;
 }
 
-void testPerformance()
+void testPerformance(int n)
 {
+    using namespace std::chrono;
+    future<int> fut[1000];
+
     clock_t t = clock();
-    future<int> fut[100];
+    auto t1 = chrono::high_resolution_clock::now();
+    duration<double> dur;
 
     ThreadPool<int(int), int> pool(4, 4);
 
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < n; ++i)
         fut[i] = pool.submit(expensiveComputation, i);
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < n; ++i)
         printf("Case #%d: %d\n", i + 1, fut[i].get());
 
-    pool.wait();
+    // pool.wait();
     t = clock() - t;
-    printf("testPerformance() with ThreadPool took %ld cycles (%f seconds)\n", t, ((float)t) / CLOCKS_PER_SEC);
+    auto t2 = chrono::high_resolution_clock::now();
+    dur = duration_cast<duration<double>>(t2 - t1);
+    printf("testPerformance() with ThreadPool took %ld cycles (%f seconds)\n", t, dur.count());
+
     pool.shutdown();
     assert(pool.isShutdown() && pool.isTerminated());
 
     // Async
     t = clock();
+    t1 = chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < 100; ++i)
-        fut[i] = async(expensiveComputation, i);
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < n; ++i)
+        fut[i] = async(launch::async, expensiveComputation, i);
+    for (int i = 0; i < n; ++i)
         printf("Case #%d: %d\n", i + 1, fut[i].get());
 
     t = clock() - t;
-    printf("testPerformance() with async() took %ld cycles (%f seconds)\n", t, ((float)t) / CLOCKS_PER_SEC);
+    t2 = chrono::high_resolution_clock::now();
+    dur = duration_cast<duration<double>>(t2 - t1);
+    printf("testPerformance() with async() took %ld cycles (%f seconds)\n", t, dur.count());
 
     // Regular
     t = clock();
+    t1 = chrono::high_resolution_clock::now();
 
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < n; ++i)
     {
         int res = expensiveComputation(i);
         printf("Case #%d: %d\n", i + 1, res);
     }
 
     t = clock() - t;
-    printf("testPerformance() with async() took %ld cycles (%f seconds)\n", t, ((float)t) / CLOCKS_PER_SEC);
+    t2 = chrono::high_resolution_clock::now();
+    dur = duration_cast<duration<double>>(t2 - t1);
+    printf("testPerformance() with a single thread took %ld cycles (%f seconds)\n", t, dur.count());
 }
 
 int main()
 {
-    testWorkerPull();
-    testPerformance();
+    // testWorkerPull();
+    testPerformance(100);
+    testPerformance(500);
 
     cout << "----- All tests finished" << endl;
     
