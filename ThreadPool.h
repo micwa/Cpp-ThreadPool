@@ -1,3 +1,6 @@
+#ifndef THREAD_POOL_H_
+#define THREAD_POOL_H_
+
 #include <vector>
 #include <queue>
 #include <future>
@@ -32,8 +35,8 @@ template <class FunctionType, class... Args>
 class ThreadPool
 {
 private:
-    static const int REAL_MAX_THREADS = 100;        // Maximum number of threads
-    static const int WAIT_TIME = 25;                // Milliseconds between sleeping for wait()
+    static const int REAL_MAX_THREADS;      // Maximum number of threads
+    static const int WAIT_TIME;             // Milliseconds between sleeping for wait()
 
     std::vector<std::thread> threads_;
     std::queue<Task<FunctionType, Args...>> tasks_;
@@ -46,7 +49,7 @@ private:
     void doWork(int id);
     void notifyNewTask();
 public:
-    ThreadPool(int initialThreads, int maxThreads = -1);
+    ThreadPool(int initialThreads, int maxThreads);
     ~ThreadPool();
     
     int activeThreads() const;
@@ -66,6 +69,13 @@ public:
     submit(Fn&& fn, DeducedArgs&&... args);
 };
 
+template <class FunctionType, class... Args>
+const int ThreadPool<FunctionType, Args...>::REAL_MAX_THREADS = 1000;
+template <class FunctionType, class... Args>
+const int ThreadPool<FunctionType, Args...>::WAIT_TIME = 25;
+
+// Constructs a ThreadPool with the specified amount of initialThreads (must be nonnegative).
+// If initialThreads > REAL_MAX_THREADS, then REAL_MAX_THREADS are created.
 template <class FunctionType, class... Args>
 ThreadPool<FunctionType, Args...>::ThreadPool(int initialThreads, int maxThreads)
     : threads_(std::min(initialThreads, REAL_MAX_THREADS))
@@ -152,11 +162,11 @@ ThreadPool<FunctionType, Args...>::submit(Fn&& fn, DeducedArgs&&... args)
     using retType = typename std::result_of<Fn(Args...)>::type;
 
     if (isShutdown_)
-        return future<retType>();
+        return std::future<retType>();
 
     queueLock_.lock();
     Task<FunctionType, Args...> task(std::forward<Fn>(fn), std::forward<Args>(args)...);
-    std::future<retType> fut = std::move(task.getFuture(fn));
+    std::future<retType> fut = std::move(task.getFuture());
     tasks_.push(std::move(task));
     queueLock_.unlock();
 
@@ -236,3 +246,5 @@ void ThreadPool<FunctionType, Args...>::doWork(int id)
         //std::cerr << "[D] Task completed [thread " << id << "]" << std::endl;
     }
 }
+
+#endif /* THREAD_POOL_H */
