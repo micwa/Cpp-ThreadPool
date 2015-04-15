@@ -22,7 +22,7 @@ int printSleepPrint(int secs)
 
 void testWorkerPull()
 {
-    ThreadPool<int(int), int> pool(1, 2);
+    ThreadPool<int(int), int> pool(2);
 
     pool.execute(printSleepPrint, 7);       // Should complete after the others
     pool.execute(printSleepPrint, 2);
@@ -70,7 +70,7 @@ void testPerformance(int n)
     auto t1 = chrono::high_resolution_clock::now();
     duration<double> dur;
 
-    ThreadPool<int(int), int> pool(4, 4);
+    ThreadPool<int(int), int> pool(4);
 
     for (int i = 0; i < n; ++i)
         fut[i] = pool.submit(expensiveComputation, i);
@@ -127,7 +127,7 @@ void testExecute(int n)
     auto t1 = chrono::high_resolution_clock::now();
     duration<double> dur;
 
-    ThreadPool<int(int), int> pool(4, 4);
+    ThreadPool<int(int), int> pool(4);
 
     for (int i = 0; i < n; ++i)
         pool.execute(expensiveTask, i);
@@ -158,7 +158,7 @@ void testExecute(int n)
 
 void thisDoesntCompileOnWindows()
 {
-    ThreadPool<void()> pool(2, 2);
+    ThreadPool<void()> pool(2);
     pool.execute([]() {
         cout << "hello" << endl;
     });
@@ -173,7 +173,7 @@ int main()
     // testWorkerPull();
     testPerformance(100);
     // testPerformance(500);
-    // testExecute(100);
+    testExecute(100);
     thisDoesntCompileOnWindows();
 
     cout << "----- All tests finished" << endl;

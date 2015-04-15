@@ -35,26 +35,23 @@ template <class FunctionType, class... Args>
 class ThreadPool
 {
 private:
-    static const int REAL_MAX_THREADS;      // Maximum number of threads
     static const int WAIT_TIME;             // Milliseconds between sleeping for wait()
 
     std::vector<std::thread> threads_;
     std::queue<Task<FunctionType, Args...>> tasks_;
     std::mutex lock_;
     std::condition_variable taskAvailable_;
-    const int maxThreads_;
     int activeThreads_;
     bool isShutdown_, isForced_;
     
     void doWork(int id);
     void notifyNewTask();
 public:
-    ThreadPool(int initialThreads, int maxThreads);
+    ThreadPool(int numThreads);
     ~ThreadPool();
     
     int activeThreads() const;
-    int getPoolSize() const;
-    int getMaximumPoolSize() const;
+    int threadCount() const;
     bool isShutdown() const;
     bool isTerminated() const;
     
@@ -70,16 +67,13 @@ public:
 };
 
 template <class FunctionType, class... Args>
-const int ThreadPool<FunctionType, Args...>::REAL_MAX_THREADS = 1000;
-template <class FunctionType, class... Args>
 const int ThreadPool<FunctionType, Args...>::WAIT_TIME = 25;
 
 // Constructs a ThreadPool with the specified amount of initialThreads (must be nonnegative).
 // If initialThreads > REAL_MAX_THREADS, then REAL_MAX_THREADS are created.
 template <class FunctionType, class... Args>
-ThreadPool<FunctionType, Args...>::ThreadPool(int initialThreads, int maxThreads)
-    : threads_(std::min(initialThreads, REAL_MAX_THREADS))
-    , maxThreads_(std::min(maxThreads, REAL_MAX_THREADS))
+ThreadPool<FunctionType, Args...>::ThreadPool(int numThreads)
+    : threads_(numThreads)
     , activeThreads_(0)
     , isShutdown_(false)
     , isForced_(false)
@@ -101,22 +95,24 @@ ThreadPool<FunctionType, Args...>::~ThreadPool()
 }
 
 template <class FunctionType, class... Args>
+inline
 int ThreadPool<FunctionType, Args...>::activeThreads() const { return activeThreads_; }
 
 template <class FunctionType, class... Args>
-int ThreadPool<FunctionType, Args...>::getPoolSize() const { return threads_.size(); }
+inline
+int ThreadPool<FunctionType, Args...>::threadCount() const { return threads_.size(); }
 
 template <class FunctionType, class... Args>
-int ThreadPool<FunctionType, Args...>::getMaximumPoolSize() const { return maxThreads_; }
-
-template <class FunctionType, class... Args>
+inline
 bool ThreadPool<FunctionType, Args...>::isShutdown() const { return isShutdown_; }
 
 template <class FunctionType, class... Args>
+inline
 bool ThreadPool<FunctionType, Args...>::isTerminated() const { return isShutdown_ && activeThreads_ == 0; }
 
 template <class FunctionType, class... Args>
 template <class Fn, class... DeducedArgs>
+inline
 void ThreadPool<FunctionType, Args...>::execute(Fn&& fn, DeducedArgs&&... args)
 {
     submit(std::forward<Fn>(fn), std::forward<Args>(args)...);
@@ -175,21 +171,13 @@ void ThreadPool<FunctionType, Args...>::wait()
 }
 
 // If there are thread(s) that are not busy, notifies one of them that a new task has
-// been enqueued. Otherwise, if there are not already the maximum number of threads in the
-// ThreadPool, creates a new thread.
+// been enqueued.
 template <class FunctionType, class... Args>
+inline
 void ThreadPool<FunctionType, Args...>::notifyNewTask()
 {
-    // If all threads are busy, attempt to add another thread
-    if (threads_.size() == activeThreads_)
-    {
-        if (threads_.size() < maxThreads_)
-            threads_.push_back(std::thread(&ThreadPool::doWork, this, threads_.size()));
-    }
-    else
-    {
+    if (threads_.size() != activeThreads_)
         taskAvailable_.notify_one();
-    }
 }
 
 template <class FunctionType, class... Args>
