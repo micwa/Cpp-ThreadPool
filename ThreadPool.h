@@ -40,7 +40,7 @@ private:
 
     std::vector<std::thread> threads_;
     std::queue<Task<FunctionType, Args...>> tasks_;
-    std::mutex queueLock_, pullLock_;
+    std::mutex lock_;
     std::condition_variable taskAvailable_;
     const int maxThreads_;
     int activeThreads_;
@@ -115,6 +115,35 @@ bool ThreadPool<FunctionType, Args...>::isShutdown() const { return isShutdown_;
 template <class FunctionType, class... Args>
 bool ThreadPool<FunctionType, Args...>::isTerminated() const { return isShutdown_ && activeThreads_ == 0; }
 
+template <class FunctionType, class... Args>
+template <class Fn, class... DeducedArgs>
+void ThreadPool<FunctionType, Args...>::execute(Fn&& fn, DeducedArgs&&... args)
+{
+    submit(std::forward<Fn>(fn), std::forward<Args>(args)...);
+}
+
+// DeducedArgs must have the same (decayed) type as Args; its purpose is to force
+// deduction of template arguments, because Args, if used, would be already specified.
+template <class FunctionType, class... Args>
+template <class Fn, class... DeducedArgs>
+std::future<typename std::result_of<Fn(Args...)>::type>
+ThreadPool<FunctionType, Args...>::submit(Fn&& fn, DeducedArgs&&... args)
+{
+    using retType = typename std::result_of<Fn(Args...)>::type;
+
+    if (isShutdown_)
+        return std::future<retType>();
+
+    std::lock_guard<std::mutex> lg(lock_);
+    Task<FunctionType, Args...> task(std::forward<Fn>(fn), std::forward<Args>(args)...);
+    std::future<retType> fut = std::move(task.getFuture());
+    tasks_.push(std::move(task));
+
+    notifyNewTask();
+    
+    return std::move(fut);
+}
+
 // Signal to threads that they should finish what they're doing. If force == true,
 // all threads in this ThreadPool will be detached (and can be safely destructed).
 // (This does not block the calling thread)
@@ -127,44 +156,11 @@ void ThreadPool<FunctionType, Args...>::shutdown(bool force)
     isForced_ = force;
     isShutdown_ = true;
 
-    pullLock_.lock();                           // To prevent notify_all() from happening between loop check and wait()
     taskAvailable_.notify_all();
-    pullLock_.unlock();
 
     if (force)
         for (int i = 0; i != threads_.size(); ++i)
             threads_[i].detach();
-}
-
-// DeducedArgs must have the same (decayed) type as Args; its purpose is to force
-// deduction of template arguments, because Args, if used, would be already specified.
-// Process: with queueLock_, add new task; with pullLock_, notify a thread to pull a task
-template <class FunctionType, class... Args>
-template <class Fn, class... DeducedArgs>
-void ThreadPool<FunctionType, Args...>::execute(Fn&& fn, DeducedArgs&&... args)
-{
-    submit(std::forward<Fn>(fn), std::forward<Args>(args)...);
-}
-
-template <class FunctionType, class... Args>
-template <class Fn, class... DeducedArgs>
-std::future<typename std::result_of<Fn(Args...)>::type>
-ThreadPool<FunctionType, Args...>::submit(Fn&& fn, DeducedArgs&&... args)
-{
-    using retType = typename std::result_of<Fn(Args...)>::type;
-
-    if (isShutdown_)
-        return std::future<retType>();
-
-    queueLock_.lock();
-    Task<FunctionType, Args...> task(std::forward<Fn>(fn), std::forward<Args>(args)...);
-    std::future<retType> fut = std::move(task.getFuture());
-    tasks_.push(std::move(task));
-    queueLock_.unlock();
-
-    notifyNewTask();
-    
-    return std::move(fut);
 }
 
 // Wait for all tasks (enqueued and currently running) to complete. This function,
@@ -184,8 +180,6 @@ void ThreadPool<FunctionType, Args...>::wait()
 template <class FunctionType, class... Args>
 void ThreadPool<FunctionType, Args...>::notifyNewTask()
 {
-    std::unique_lock<std::mutex> ul(pullLock_);
-
     // If all threads are busy, attempt to add another thread
     if (threads_.size() == activeThreads_)
     {
@@ -207,7 +201,7 @@ void ThreadPool<FunctionType, Args...>::doWork(int id)
     {
         Task<FunctionType, Args...> task;
         {
-            std::unique_lock<std::mutex> ul(pullLock_);
+            std::unique_lock<std::mutex> ul(lock_);
             
             // In case somehow this thread pauses during the loop check/construction of task (and gets pre-notified)
             if (alreadyExecuted)
@@ -219,13 +213,11 @@ void ThreadPool<FunctionType, Args...>::doWork(int id)
             }
             if (isShutdown_)
                 break;
-            queueLock_.lock();
             task = std::move(tasks_.front());
             tasks_.pop();
-            queueLock_.unlock();
 
             ++activeThreads_;
-        }   // So pullLock_ is unlocked after activeThreads_ increments/a task is *definitely* pulled
+        }   // So lock_ is unlocked after activeThreads_ increments/a task is *definitely* pulled
         
         task.execute();
         alreadyExecuted = true;
