@@ -143,15 +143,7 @@ template <class FunctionType, class... Args>
 template <class Fn, class... DeducedArgs>
 void ThreadPool<FunctionType, Args...>::execute(Fn&& fn, DeducedArgs&&... args)
 {
-    if (isShutdown_)
-        return;
-
-    queueLock_.lock();
-    Task<FunctionType, Args...> task(std::forward<Fn>(fn), std::forward<Args>(args)...);
-    tasks_.push(std::move(task));
-    queueLock_.unlock();
-    
-    notifyNewTask();
+    submit(std::forward<Fn>(fn), std::forward<Args>(args)...);
 }
 
 template <class FunctionType, class... Args>
@@ -192,7 +184,7 @@ void ThreadPool<FunctionType, Args...>::wait()
 template <class FunctionType, class... Args>
 void ThreadPool<FunctionType, Args...>::notifyNewTask()
 {
-    pullLock_.lock();
+    std::unique_lock<std::mutex> ul(pullLock_);
 
     // If all threads are busy, attempt to add another thread
     if (threads_.size() == activeThreads_)
@@ -204,7 +196,6 @@ void ThreadPool<FunctionType, Args...>::notifyNewTask()
     {
         taskAvailable_.notify_one();
     }
-    pullLock_.unlock();
 }
 
 template <class FunctionType, class... Args>
@@ -224,12 +215,7 @@ void ThreadPool<FunctionType, Args...>::doWork(int id)
 
             while (tasks_.empty() && !isShutdown_)
             {
-                //std::cerr << "[D] Waiting for task [thread " << id << "]" << std::endl;
                 taskAvailable_.wait(ul);
-                /*if (!isShutdown_)
-                    std::cerr << "[D] Received task [thread " << id << "]" << std::endl;
-                else
-                    std::cerr << "[D] Shut down [thread " << id << "]" << std::endl;*/
             }
             if (isShutdown_)
                 break;
@@ -243,7 +229,6 @@ void ThreadPool<FunctionType, Args...>::doWork(int id)
         
         task.execute();
         alreadyExecuted = true;
-        //std::cerr << "[D] Task completed [thread " << id << "]" << std::endl;
     }
 }
 
