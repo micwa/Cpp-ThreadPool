@@ -158,6 +158,7 @@ void testExecute(int n)
 
 void thisDoesntCompileOnWindows()
 {
+#ifndef _WIN32
     ThreadPool<void()> pool(2);
     pool.execute([]() {
         cout << "hello" << endl;
@@ -166,6 +167,7 @@ void thisDoesntCompileOnWindows()
         cout << "world" << endl;
     });
     pool.wait();
+#endif
 }
 
 int main()
