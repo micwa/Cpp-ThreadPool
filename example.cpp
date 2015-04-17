@@ -59,12 +59,8 @@ void exampleWindows()
     // Wrap printAndIncrementGvar(int) in a lambda
     for (int i = 0; i < 5; ++i)
     {
-        pool.execute([](int x) -> int {
-            printAndIncrementGvar(x);
-            return 0;
-        }, i);
+        pool.execute([](int x) { printAndIncrementGvar(x); return 0; }, i);
     }
-    pool.wait();
 }
 
 void exampleLambdaEverything()
@@ -83,7 +79,6 @@ void exampleLambdaEverything()
     pool.execute([]() {
         cout << "world" << endl;
     });
-    pool.wait();
 #endif
 }
 
