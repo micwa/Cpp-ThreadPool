@@ -42,12 +42,12 @@ private:
     std::mutex lock_;
     std::condition_variable taskAvailable_;
     int activeThreads_;
-    bool isShutdown_, isForced_;
+    bool isShutdown_, isForced_, waitOnDestroy_;
     
     void doWork(int id);
     void notifyNewTask();
 public:
-    ThreadPool(int numThreads);
+    ThreadPool(int numThreads, bool waitOnDestroy = true);
     ~ThreadPool();
     
     int activeThreads() const;
@@ -69,14 +69,15 @@ public:
 template <class FunctionType, class... Args>
 const int ThreadPool<FunctionType, Args...>::WAIT_TIME = 25;
 
-// Constructs a ThreadPool with the specified amount of initialThreads (must be nonnegative).
-// If initialThreads > REAL_MAX_THREADS, then REAL_MAX_THREADS are created.
+// Constructs a ThreadPool with the specified amount of threads (must be nonnegative).
+// If waitOnDestroy is true, the ThreadPool will call wait() on destruction; otherwise, it will not.
 template <class FunctionType, class... Args>
-ThreadPool<FunctionType, Args...>::ThreadPool(int numThreads)
+ThreadPool<FunctionType, Args...>::ThreadPool(int numThreads, bool waitOnDestroy)
     : threads_(numThreads)
     , activeThreads_(0)
     , isShutdown_(false)
     , isForced_(false)
+    , waitOnDestroy_(waitOnDestroy)
 {
     for (int i = 0; i != threads_.size(); ++i)
         threads_[i] = std::move(std::thread(&ThreadPool::doWork, this, i + 1));
@@ -86,6 +87,8 @@ ThreadPool<FunctionType, Args...>::ThreadPool(int numThreads)
 template <class FunctionType, class... Args>
 ThreadPool<FunctionType, Args...>::~ThreadPool()
 {
+    if (waitOnDestroy_)
+        wait();
     if (!isShutdown_)
         shutdown(false);
 
