@@ -20,11 +20,14 @@
  * ThreadPool::submit() enqueues tasks and returns a std::future that represents
  * the result of the task, which becomes available after the task executes.
  *
- * ThreadPools can be constructed with a maximum number of threads, and can be
- * shutdown. Shutting down a ThreadPool causes it to ignore further calls to
- * execute() and submit(), but it will continue executing tasks in its queue.
- * Shutting down a ThreadPool forcefully (force = True) causes all it to detach
- * all its threads and no longer execute any tasks.
+ * ThreadPools are constructed with a fixed number of threads, and can be waited
+ * on and shutdown. Calling wait() on a ThreadPool blocks the calling thread until
+ * all tasks (running and in the queue) are completed. The constructor takes a bool
+ * specifying whether a ThreadPool should wait() on all its tasks when its destructor
+ * is called. Otherwise, its destructor will simply call shutdown(). Shutting down
+ * a ThreadPool causes it to ignore further calls to execute() and submit(), and
+ * complete only currently running tasks. The force option to shutdown() causes it
+ * to (in addition to ignoring calls to execute()/submit()) detach() all its threads.
  *
  * Known issues:
  *  - on MSVC2012/2013, packaged_task<void(Args...)> causes a compile error so you
