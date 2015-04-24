@@ -27,6 +27,31 @@ Known issues:
 
 ### Examples
 
+A ThreadPool with function type/argument(s) as template parameters:
+
+    int print(short s) { std::cout << s << std::endl; return 0; }
+    ...
+    ThreadPool<int(short), short> pool(2, false);
+    std::future<int> fut;
+    
+    pool.execute(print, 42);
+    fut = pool.submit(print, 57);
+    pool.wait();                    // Since waitOnDestroy == false
+    std::cout << fut.get() << std::endl;
+
+Using lambdas to prevent long ThreadPool declarations (and also allow you to
+execute any kind of function):
+
+    ThreadPool<void()> pool(2);     // Warning: doesn't work on MSVC2012/2013
+    pool.execute([](std::string s) {
+        cout << "hello " << s;
+    }, "bob");
+    pool.execute([]() {
+        cout << "world" << endl;
+        return 0;
+    });
+    // Automatically calls wait() when pool is destructed
+
 ### License
 
 Copyright (c) 2015 by Michael Wang
