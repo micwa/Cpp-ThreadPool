@@ -12,27 +12,26 @@
 
 #include "Task.h"
 
-/*
- * A thread pool class that uses std::threads to perform multiple tasks asynchronously
- * (functions must have the same type and arguments, however; lambdas do help).
- * Tasks are enqueued using either ThreadPool::execute() or ThreadPool()::submit().
- * ThreadPool::execute() enqueues tasks and discards their return value (if any).
- * ThreadPool::submit() enqueues tasks and returns a std::future that represents
- * the result of the task, which becomes available after the task executes.
+/**
+ * Copyright (c) 2015 by Michael Wang
  *
- * ThreadPools are constructed with a fixed number of threads, and can be waited
- * on and shutdown. Calling wait() on a ThreadPool blocks the calling thread until
- * all tasks (running and in the queue) are completed. The constructor takes a bool
- * specifying whether a ThreadPool should wait() on all its tasks when its destructor
- * is called. Otherwise, its destructor will simply call shutdown(). Shutting down
- * a ThreadPool causes it to ignore further calls to execute() and submit(), and
- * complete only currently running tasks. The force option to shutdown() causes it
- * to (in addition to ignoring calls to execute()/submit()) detach() all its threads.
- *
- * Known issues:
- *  - on MSVC2012/2013, packaged_task<void(Args...)> causes a compile error so you
- *    can not declare ThreadPools with a function returning void, e.g.
- *    ThreadPool<void(int), int> is invalid
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 template <class FunctionType, class... Args>
 class ThreadPool
