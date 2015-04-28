@@ -1,8 +1,10 @@
 ## ThreadPool
 
 A thread pool implementation that uses `std::thread`s to perform multiple
-actions asynchronously. `ThreadPool`s are constructed with a fixed number of
-threads and a function type (see Examples).
+actions asynchronously. Simply `#include "ThreadPool.h"` and declare a
+ThreadPool with `ThreadPool<fnType, args...>` to get started (see Examples).
+You can download all three files separately (ThreadPool.h, Task.h, seq.h)
+or use the ThreadPool.h in the `single-header` directory.
 
 Tasks can be enqueued using either `ThreadPool::execute()` or `ThreadPool::submit()`.
 `ThreadPool::execute()` adds a task (i.e., a function pointer along with arguments)
@@ -21,9 +23,9 @@ calls to `execute()` and `submit()`, and complete only currently running tasks.
 If the force option to `shutdown()` is set, it also detach()es all its threads.
 
 Known issues:
-* on MSVC2012/2013, `std::packaged_task<void(Args...)>` causes a compile error
-  so you can not declare ThreadPools with a function returning void, e.g.
-  `ThreadPool<void(int), int>` is invalid
+* on MSVC2012/2013, `std::packaged_task<void(Args...)>` causes a compilation
+  error so you can not declare ThreadPools with a function returning void,
+  e.g. `ThreadPool<void(int), int>` is invalid
 
 ### Examples
 
@@ -39,8 +41,8 @@ A ThreadPool with function type/argument(s) as template parameters:
     pool.wait();                    // Since waitOnDestroy == false
     std::cout << fut.get() << std::endl;
 
-Using lambdas to prevent long ThreadPool declarations (and also allow you to
-execute any kind of function):
+You can use lambdas to prevent long ThreadPool declarations (and also execute
+any kind of function):
 
     ThreadPool<void()> pool(2);     // Warning: doesn't work on MSVC2012/2013
     pool.execute([](std::string s) {
