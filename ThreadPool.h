@@ -37,7 +37,7 @@ template <class FunctionType, class... Args>
 class ThreadPool
 {
 private:
-    static const int WAIT_TIME;             // Milliseconds between sleeping for wait()
+    static const int MAX_WAIT_TIME;         // Maximum time (in milliseconds) to sleep for in wait()
 
     std::vector<std::thread> threads_;
     std::queue<Task<FunctionType, Args...>> tasks_;
@@ -47,7 +47,6 @@ private:
     bool isShutdown_, isForced_, waitOnDestroy_;
     
     void doWork(int id);
-    void notifyNewTask();
 public:
     ThreadPool(int numThreads, bool waitOnDestroy = true);
     ~ThreadPool();
@@ -69,7 +68,7 @@ public:
 };
 
 template <class FunctionType, class... Args>
-const int ThreadPool<FunctionType, Args...>::WAIT_TIME = 25;
+const int ThreadPool<FunctionType, Args...>::MAX_WAIT_TIME = 50;
 
 // Constructs a ThreadPool with the specified amount of threads (must be nonnegative).
 // If waitOnDestroy is true, the ThreadPool will call wait() on destruction; otherwise, it will not.
@@ -135,12 +134,14 @@ ThreadPool<FunctionType, Args...>::submit(Fn&& fn, DeducedArgs&&... args)
     if (isShutdown_)
         return std::future<retType>();
 
-    std::lock_guard<std::mutex> lg(lock_);
+    std::unique_lock<std::mutex> ul(lock_);
+
     Task<FunctionType, Args...> task(std::forward<Fn>(fn), std::forward<Args>(args)...);
     std::future<retType> fut = std::move(task.getFuture());
     tasks_.push(std::move(task));
 
-    notifyNewTask();
+    ul.unlock();
+    taskAvailable_.notify_one();
     
     return std::move(fut);
 }
@@ -171,18 +172,14 @@ void ThreadPool<FunctionType, Args...>::shutdown(bool force)
 template <class FunctionType, class... Args>
 void ThreadPool<FunctionType, Args...>::wait()
 {
-    while (activeThreads_ != 0 || !tasks_.empty())
-        std::this_thread::sleep_for(std::chrono::milliseconds(WAIT_TIME));
-}
+    const int multiplier = 2;
+    int waitTime = 1;
 
-// If there are thread(s) that are not busy, notifies one of them that a new task has
-// been enqueued.
-template <class FunctionType, class... Args>
-inline
-void ThreadPool<FunctionType, Args...>::notifyNewTask()
-{
-    if (threads_.size() != activeThreads_)
-        taskAvailable_.notify_one();
+    while (activeThreads_ != 0 || !tasks_.empty())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(waitTime));
+        waitTime = std::min(MAX_WAIT_TIME, multiplier * waitTime);
+    }
 }
 
 template <class FunctionType, class... Args>
@@ -196,16 +193,15 @@ void ThreadPool<FunctionType, Args...>::doWork(int id)
         {
             std::unique_lock<std::mutex> ul(lock_);
             
-            // In case somehow this thread pauses during the loop check/construction of task (and gets pre-notified)
+            // In case somehow this thread pauses during the loop check/construction of task
             if (alreadyExecuted)
                 --activeThreads_;
 
             while (tasks_.empty() && !isShutdown_)
-            {
                 taskAvailable_.wait(ul);
-            }
             if (isShutdown_)
                 break;
+
             task = std::move(tasks_.front());
             tasks_.pop();
 
