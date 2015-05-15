@@ -183,7 +183,7 @@ void ThreadPool<FunctionType, Args...>::wait()
 }
 
 template <class FunctionType, class... Args>
-void ThreadPool<FunctionType, Args...>::doWork(int id)
+void ThreadPool<FunctionType, Args...>::doWork(int)
 {
     // Dequeue tasks until the thread pool is shutdown
     while (!isShutdown_)
