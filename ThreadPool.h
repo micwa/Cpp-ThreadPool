@@ -134,13 +134,13 @@ ThreadPool<FunctionType, Args...>::submit(Fn&& fn, DeducedArgs&&... args)
     if (isShutdown_)
         return std::future<retType>();
 
-    std::unique_lock<std::mutex> ul(lock_);
-
     Task<FunctionType, Args...> task(std::forward<Fn>(fn), std::forward<Args>(args)...);
     std::future<retType> fut = std::move(task.getFuture());
-    tasks_.push(std::move(task));
 
+    std::unique_lock<std::mutex> ul(lock_);
+    tasks_.push(std::move(task));
     ul.unlock();
+
     taskAvailable_.notify_one();
     
     return std::move(fut);
@@ -186,30 +186,24 @@ template <class FunctionType, class... Args>
 void ThreadPool<FunctionType, Args...>::doWork(int id)
 {
     // Dequeue tasks until the thread pool is shutdown
-    bool alreadyExecuted = false;
     while (!isShutdown_)
     {
         Task<FunctionType, Args...> task;
         {
             std::unique_lock<std::mutex> ul(lock_);
-            
-            // In case somehow this thread pauses during the loop check/construction of task
-            if (alreadyExecuted)
-                --activeThreads_;
 
             while (tasks_.empty() && !isShutdown_)
                 taskAvailable_.wait(ul);
             if (isShutdown_)
                 break;
 
+            ++activeThreads_;
             task = std::move(tasks_.front());
             tasks_.pop();
-
-            ++activeThreads_;
         }   // So lock_ is unlocked after activeThreads_ increments/a task is *definitely* pulled
         
         task.execute();
-        alreadyExecuted = true;
+        --activeThreads_;
     }
 }
 
