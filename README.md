@@ -1,18 +1,19 @@
 ## ThreadPool
 
 A thread pool implementation that uses `std::thread`s to perform multiple
-actions asynchronously. Simply `#include "ThreadPool.h"` and declare a
-ThreadPool with `ThreadPool<fnType, args...>` to get started (see Examples).
-You can download all three files separately (ThreadPool.h, Task.h, seq.h)
-or use the ThreadPool.h in the `single-header` directory.
+actions asynchronously (C++11 or newer is required). Simply include the header
+"ThreadPool.h" and declare a ThreadPool with `ThreadPool<fnType, args...>` to
+get started (see Examples).  You can download all three files separately
+(ThreadPool.h, Task.h, seq.h) or use the ThreadPool.h in the "single-header"
+directory.
 
 Tasks can be enqueued using either `ThreadPool::execute()` or `ThreadPool::submit()`.
 `ThreadPool::execute()` adds a task (i.e., a function pointer along with arguments)
 to the thread pool's internal queue, and executes it. The return value (if any)
 of the executed function is discarded. `ThreadPool::submit()` does the same,
-except it returns an `std::future<retType>` that represents the result of the
-enqueued task. As one would expect, calling `get()` on the `std::future` object
-will block until the corresponding task completes.
+except it returns an `std::future<returnType>` that represents the result of
+the enqueued task. Calling `get()` on the `std::future` object will block until
+the corresponding task completes (as usual).
 
 ThreadPools also can be waited on and shutdown. Calling `wait()` blocks the
 current thread until all tasks (running and in the queue) are completed.
